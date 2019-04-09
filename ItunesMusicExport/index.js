@@ -3,9 +3,9 @@ import { NativeModules } from 'react-native';
 const { RNItunesMusicExport } = require('react-native').NativeModules;
 
 module.exports = {
-  getAlltracks: function() {
+  getAlltracks: function(params) {
     return new Promise((resolve, reject) => {
-      RNItunesMusicExport.getList('tracks', (err, tracks) => {
+      RNItunesMusicExport.getList('tracks', params, (err, tracks) => {
         if (err) {
           reject(err);
         } else {
@@ -14,9 +14,9 @@ module.exports = {
       });
     });
   },
-  getAllPlayList: function() {
+  getAllPlayList: function(params) {
     return new Promise((resolve, reject) => {
-      RNItunesMusicExport.getList('playlists', (err, playlists) => {
+      RNItunesMusicExport.getList('playlists', params, (err, playlists) => {
         if (err) {
           reject(err);
         } else {
@@ -25,9 +25,9 @@ module.exports = {
       });
     });
   },
-  getAllAlbums: function() {
+  getAllAlbums: function(params) {
     return new Promise((resolve, reject) => {
-      RNItunesMusicExport.getList('albums', (err, albums) => {
+      RNItunesMusicExport.getList('albums', params, (err, albums) => {
         if (err) {
           reject(err);
         } else {
@@ -36,9 +36,9 @@ module.exports = {
       });
     });
   },
-  getAllArtists: function() {
+  getAllArtists: function(params) {
     return new Promise((resolve, reject) => {
-      RNItunesMusicExport.getList('artists', (err, artists) => {
+      RNItunesMusicExport.getList('artists', params, (err, artists) => {
         if (err) {
           reject(err);
         } else {
@@ -47,9 +47,9 @@ module.exports = {
       });
     });
   },
-  getAllPodcast: function() {
+  getAllPodcast: function(params) {
     return new Promise((resolve, reject) => {
-      RNItunesMusicExport.getList('podcasts', (err, podcasts) => {
+      RNItunesMusicExport.getList('podcasts', params, (err, podcasts) => {
         if (err) {
           reject(err);
         } else {
@@ -58,9 +58,9 @@ module.exports = {
       });
     });
   },
-  getAllAudioBook: function() {
+  getAllAudioBook: function(params) {
     return new Promise((resolve, reject) => {
-      RNItunesMusicExport.getList('audioBooks', (err, audioBooks) => {
+      RNItunesMusicExport.getList('audioBooks', params, (err, audioBooks) => {
         if (err) {
           reject(err);
         } else {
