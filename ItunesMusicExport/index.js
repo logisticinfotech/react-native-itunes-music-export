@@ -5,11 +5,11 @@ const { RNItunesMusicExport } = require('react-native').NativeModules;
 module.exports = {
   getAlltracks: function(params) {
     return new Promise((resolve, reject) => {
-      RNItunesMusicExport.getList('tracks', params, (err, tracks) => {
+      RNItunesMusicExport.getList('tracks', params, (err, trackLists) => {
         if (err) {
           reject(err);
         } else {
-          resolve(tracks);
+          resolve(trackLists);
         }
       });
     });

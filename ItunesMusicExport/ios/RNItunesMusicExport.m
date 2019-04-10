@@ -35,17 +35,26 @@ RCT_EXPORT_METHOD(getList:(NSString *)type:(NSDictionary *)param callback:(RCTRe
                     [self GetAllTrackList:saveToLocal trackList:^(NSArray *trackList) {
                         callback(@[[NSNull null], trackList]);
                     }];
-                    
                 }else if([type isEqualToString: @"playlists"]){
-                    callback(@[[NSNull null], [self GetAllPlayList:saveToLocal]]);
+                    [self GetAllPlayList:saveToLocal playList:^(NSArray *playList) {
+                        callback(@[[NSNull null], playList]);
+                    }];
                 }else if([type isEqualToString: @"albums"]){
-                    callback(@[[NSNull null], [self GetAllAlbumList:saveToLocal]]);
+                    [self GetAllAlbumList:saveToLocal albumList:^(NSArray *albumList) {
+                        callback(@[[NSNull null], albumList]);
+                    }];
                 }else if([type isEqualToString: @"artists"]){
-                    callback(@[[NSNull null], [self GetAllArtistList:saveToLocal]]);
+                    [self GetAllArtistList:saveToLocal artistList:^(NSArray *artistList) {
+                        callback(@[[NSNull null], artistList]);
+                    }];
                 }else if([type isEqualToString: @"podcasts"]){
-                    callback(@[[NSNull null], [self GetAllPodcast:saveToLocal]]);
+                    [self GetAllPodcast:saveToLocal trackList:^(NSArray *trackList) {
+                        callback(@[[NSNull null], trackList]);
+                    }];
                 }else if([type isEqualToString: @"audioBooks"]){
-                    callback(@[[NSNull null], [self GetAllAudioBook:saveToLocal]]);
+                    [self GetAllAudioBook:saveToLocal trackList:^(NSArray *trackList) {
+                        callback(@[[NSNull null], trackList]);
+                    }];
                 }
                 // Authorised
                 break;
@@ -58,50 +67,95 @@ RCT_EXPORT_METHOD(getList:(NSString *)type:(NSDictionary *)param callback:(RCTRe
 }
 
 //MARK:- GET ALL SONG/Track List
--(void)GetAllTrackList:(BOOL)saveToLocal trackList:(void (^) (NSArray *trackList))exportCompleted {
+
+-(void)GetAllTrackList:(BOOL)saveToLocal  trackList:(void (^) (NSArray *trackList))exportCompleted  {
     MPMediaQuery *query = [MPMediaQuery songsQuery];
     NSArray *tracksArray = [query items];
     NSMutableArray *trackListData = [[NSMutableArray alloc]init];
     for(MPMediaItem *item in tracksArray) {
-        NSMutableDictionary *trackData = [self getMediaItemDetail:item saveToLocal:saveToLocal];
+        NSMutableDictionary *trackData = [self getMediaItemDetail:item];
         [trackListData addObject:trackData];
     }
     if(saveToLocal) {
-        [self saveTracksToDocucmentDirectory:tracksArray exporting:^(int progress) {
-            if(progress == tracksArray.count) {
-                exportCompleted(trackListData);
-            }
-        }];
+        if(tracksArray.count > 0) {
+//            [self saveTracksToDocucmentDirectory:tracksArray exporting:^(int progress) {
+//                float value = (((float)progress/tracksArray.count) * 100);
+//                NSLog(@"%f",value);
+//                if(progress == tracksArray.count) {
+//                    exportCompleted(trackListData);
+//                }else{
+//                    storedProgress([NSString stringWithFormat:@"%.2f",value]);
+//                }
+//            }];
+            [self saveTracksToDocucmentDirectory:tracksArray exporting:^(int progress) {
+                if(progress == tracksArray.count) {
+                    exportCompleted(trackListData);
+                }
+            }];
+        }else{
+            exportCompleted(trackListData);
+        }
     }else{
         exportCompleted(trackListData);
     }
 }
--(NSMutableArray *)GetAllPodcast:(BOOL)saveToLocal {
+
+//MARK:- GET ALL PodCast List
+
+-(void)GetAllPodcast:(BOOL)saveToLocal trackList:(void (^) (NSArray *trackList))exportCompleted{
     MPMediaQuery *query = [MPMediaQuery podcastsQuery];
     NSArray *tracksArray = [query items];
-    NSMutableArray *trackList = [[NSMutableArray alloc]init];
+    NSMutableArray *trackListData = [[NSMutableArray alloc]init];
     for(MPMediaItem *item in tracksArray) {
-        NSMutableDictionary *trackData = [self getMediaItemDetail:item saveToLocal:saveToLocal];
-        [trackList addObject:trackData];
+        NSMutableDictionary *trackData = [self getMediaItemDetail:item];
+        [trackListData addObject:trackData];
     }
-    return trackList;
+    if(saveToLocal) {
+        if(tracksArray.count > 0) {
+            [self saveTracksToDocucmentDirectory:tracksArray exporting:^(int progress) {
+                if(progress == tracksArray.count) {
+                    exportCompleted(trackListData);
+                }
+            }];
+        }else{
+            exportCompleted(trackListData);
+        }
+    }else{
+        exportCompleted(trackListData);
+    }
 }
--(NSMutableArray *)GetAllAudioBook:(BOOL)saveToLocal {
+
+//MARK:- GET ALL AudioBook List
+
+-(void)GetAllAudioBook:(BOOL)saveToLocal trackList:(void (^) (NSArray *trackList))exportCompleted{
     MPMediaQuery *query = [MPMediaQuery audiobooksQuery];
     NSArray *tracksArray = [query items];
-    NSMutableArray *trackList = [[NSMutableArray alloc]init];
+    NSMutableArray *trackListData = [[NSMutableArray alloc]init];
     for(MPMediaItem *item in tracksArray) {
-        NSMutableDictionary *trackData = [self getMediaItemDetail:item saveToLocal:saveToLocal];
-        [trackList addObject:trackData];
+        NSMutableDictionary *trackData = [self getMediaItemDetail:item];
+        [trackListData addObject:trackData];
     }
-    return trackList;
+    if(saveToLocal) {
+        if(tracksArray.count > 0) {
+            [self saveTracksToDocucmentDirectory:tracksArray exporting:^(int progress) {
+                if(progress == tracksArray.count) {
+                    exportCompleted(trackListData);
+                }
+            }];
+        }else{
+            exportCompleted(trackListData);
+        }
+    }else{
+        exportCompleted(trackListData);
+    }
 }
 //MARK:- GET ALL PlayList
 
--(NSMutableArray *)GetAllPlayList:(BOOL)saveToLocal {
+-(void)GetAllPlayList:(BOOL)saveToLocal playList:(void (^) (NSArray *playList))exportCompleted {
     MPMediaQuery *query = [MPMediaQuery playlistsQuery];
     NSArray *playListItems = [query collections];
     NSMutableArray *playListArray = [[NSMutableArray alloc]init];
+    NSMutableArray *totalPlayListTracks = [[NSMutableArray alloc]init];
     for(MPMediaPlaylist *playList in playListItems) {
         NSMutableDictionary *dict = [[NSMutableDictionary alloc]init];
         NSString *playListName = [playList valueForProperty: MPMediaPlaylistPropertyName];
@@ -110,8 +164,9 @@ RCT_EXPORT_METHOD(getList:(NSString *)type:(NSDictionary *)param callback:(RCTRe
         NSString *authorName = [playList valueForProperty: MPMediaPlaylistPropertyAuthorDisplayName];
         NSMutableArray *tracksArray = [[NSMutableArray alloc]init];
         NSArray *tracks = [playList items];
+        [totalPlayListTracks addObjectsFromArray:tracks];
         for(MPMediaItem *item in tracks) {
-            NSMutableDictionary *trackData = [self getMediaItemDetail:item saveToLocal:saveToLocal];
+            NSMutableDictionary *trackData = [self getMediaItemDetail:item];
             [tracksArray addObject:trackData];
         }
         if(playListName != nil || [playListName isKindOfClass:[NSNull class]]) {
@@ -133,31 +188,58 @@ RCT_EXPORT_METHOD(getList:(NSString *)type:(NSDictionary *)param callback:(RCTRe
             [playListArray addObject:dict];
         }
     }
-    return playListArray;
+    if(saveToLocal) {
+        if(totalPlayListTracks.count > 0){
+            [self saveTracksToDocucmentDirectory:totalPlayListTracks exporting:^(int progress) {
+                if(progress == totalPlayListTracks.count) {
+                    exportCompleted(playListArray);
+                }
+            }];
+        }else{
+            exportCompleted(playListArray);
+        }
+    }else{
+        exportCompleted(playListArray);
+    }
 }
 
 
 //MARK:- Get All Album List
 
--(NSMutableArray *)GetAllAlbumList:(BOOL)saveToLocal {
+-(void)GetAllAlbumList:(BOOL)saveToLocal albumList:(void (^) (NSArray *albumList))exportCompleted{
     MPMediaQuery *query = [MPMediaQuery albumsQuery];
     NSArray *albumList = [query collections];
     NSMutableArray *albumArray = [[NSMutableArray alloc]init];
+    NSMutableArray *totalAlbumTracks = [[NSMutableArray alloc]init];
     for(MPMediaItemCollection *Album in albumList) {
+        NSArray *tracks = [Album items];
+        [totalAlbumTracks addObjectsFromArray:tracks];
         NSMutableDictionary *albumData = [self getMediaAlbumDetail:Album saveToLocal:saveToLocal];
         [albumArray addObject:albumData];
-        
     }
-    return albumArray;
+    if(saveToLocal) {
+        if(totalAlbumTracks.count > 0) {
+            [self saveTracksToDocucmentDirectory:totalAlbumTracks exporting:^(int progress) {
+                if(progress == totalAlbumTracks.count) {
+                    exportCompleted(albumArray);
+                }
+            }];
+        }else{
+             exportCompleted(albumArray);
+        }
+    }else{
+        exportCompleted(albumArray);
+    }
 }
 
 //MARK:- Get All Artist List
 
--(NSMutableArray *)GetAllArtistList:(BOOL)saveToLocal {
+-(void)GetAllArtistList:(BOOL)saveToLocal artistList:(void (^) (NSArray *artistList))exportCompleted {
     MPMediaQuery *artistsQuery = [MPMediaQuery artistsQuery];
     artistsQuery.groupingType = MPMediaGroupingAlbumArtist;
     NSArray *artistList = [artistsQuery collections];
     NSMutableArray *artistArray = [[NSMutableArray alloc]init];
+    NSMutableArray *totalAlbumTracks = [[NSMutableArray alloc]init];
     for (MPMediaItemCollection *artist in artistList) {
         NSMutableDictionary *dict = [[NSMutableDictionary alloc]init];
         MPMediaItem *albumArtist = [artist representativeItem];
@@ -168,6 +250,8 @@ RCT_EXPORT_METHOD(getList:(NSString *)type:(NSDictionary *)param callback:(RCTRe
         NSArray *artistsAblums = [albumQuery collections];
         NSMutableArray *albumArray = [[NSMutableArray alloc]init];
         for(MPMediaItemCollection *Album in artistsAblums) {
+            NSArray *tracks = [Album items];
+            [totalAlbumTracks addObjectsFromArray:tracks];
             NSMutableDictionary *albumData = [self getMediaAlbumDetail:Album saveToLocal:saveToLocal];
             [albumArray addObject:albumData];
             MPMediaItem *mainItem  = [Album representativeItem];
@@ -181,8 +265,19 @@ RCT_EXPORT_METHOD(getList:(NSString *)type:(NSDictionary *)param callback:(RCTRe
         }
         [artistArray addObject:dict];
     }
-    NSLog(@"artistArray : %@",artistArray);
-    return artistArray;
+    if(saveToLocal) {
+        if(totalAlbumTracks.count > 0) {
+            [self saveTracksToDocucmentDirectory:totalAlbumTracks exporting:^(int progress) {
+                if(progress == totalAlbumTracks.count) {
+                    exportCompleted(artistArray);
+                }
+            }];
+        }else{
+            exportCompleted(artistArray);
+        }
+    }else{
+        exportCompleted(artistArray);
+    }
 }
 
 //MARK:- Set Albumn List Raw Data
@@ -191,12 +286,12 @@ RCT_EXPORT_METHOD(getList:(NSString *)type:(NSDictionary *)param callback:(RCTRe
     NSMutableDictionary *dict = [[NSMutableDictionary alloc]init];
     MPMediaItem *mainItem    = [album representativeItem];
     NSString *albumTitle = [mainItem valueForProperty: MPMediaItemPropertyAlbumTitle];
-//    MPMediaItemArtwork *albumArtWork = [mainItem valueForProperty:MPMediaItemPropertyArtwork];
     NSString *artistName = [mainItem valueForProperty: MPMediaItemPropertyAlbumArtist];
+    //    MPMediaItemArtwork *albumArtWork = [mainItem valueForProperty:MPMediaItemPropertyArtwork];
     NSMutableArray *tracksArray = [[NSMutableArray alloc]init];
     NSArray *tracks = [album items];
     for(MPMediaItem *item in tracks) {
-        NSMutableDictionary *trackData = [self getMediaItemDetail:item saveToLocal:saveToLocal];
+        NSMutableDictionary *trackData = [self getMediaItemDetail:item];
         [tracksArray addObject:trackData];
     }
     if(albumTitle != nil || [albumTitle isKindOfClass:[NSNull class]]) {
@@ -219,7 +314,7 @@ RCT_EXPORT_METHOD(getList:(NSString *)type:(NSDictionary *)param callback:(RCTRe
 
 //MARK:- Set Track List Raw Data
 
--(NSMutableDictionary *)getMediaItemDetail:(MPMediaItem *)item saveToLocal:(BOOL)saveToLocal  {
+-(NSMutableDictionary *)getMediaItemDetail:(MPMediaItem *)item  {
     NSMutableDictionary *dict = [[NSMutableDictionary alloc]init];
     NSString *title = [item valueForProperty: MPMediaItemPropertyTitle];
     NSString *albumTitle = [item valueForProperty: MPMediaItemPropertyAlbumTitle];
