@@ -6,7 +6,13 @@
 //<React/>
 #endif
 
-@interface RNItunesMusicExport : NSObject <RCTBridgeModule>
+#import <MediaPlayer/MediaPlayer.h>
+#import <UIKit/UIKit.h>
+#import <AVFoundation/AVFoundation.h>
+#import <MediaPlayer/MediaPlayer.h>
+#import <AVFoundation/AVFoundation.h>
+
+@interface RNItunesMusicExport : NSObject <RCTBridgeModule,MPMediaPickerControllerDelegate>
 
 @end
-  
+
