@@ -5,12 +5,24 @@
 @implementation RNItunesMusicExport
 RCTResponseSenderBlock CallBack;
 BOOL saveToLocal = false;
-
+float totalProgress;
+UILabel *lblProgress;
+UILabel *lblTitle;
+int currentIndex;
+AVAssetExportSession *exportSession;
 - (dispatch_queue_t)methodQueue
 {
     return dispatch_get_main_queue();
 }
 RCT_EXPORT_MODULE()
+
+
+- (NSArray<NSString *> *)supportedEvents
+{
+    return @[@"ProgressEvent"];
+}
+
+
 
 RCT_EXPORT_METHOD(getList:(NSDictionary *)param callback:(RCTResponseSenderBlock)callback ) {
     CallBack=callback;
@@ -41,20 +53,23 @@ RCT_EXPORT_METHOD(getList:(NSDictionary *)param callback:(RCTResponseSenderBlock
         }
     }];
 }
-
+-(UIViewController *)GetPresentedVC {
+    UIViewController *topViewController = [[[UIApplication sharedApplication] keyWindow] rootViewController];
+    UIViewController *presentedVC = [[[UIApplication sharedApplication]keyWindow]rootViewController];
+    if(presentedVC.presentedViewController) {
+        presentedVC = presentedVC.presentedViewController;
+    }else if([presentedVC isKindOfClass:[UINavigationController class]]){
+        UINavigationController *navVc = (UINavigationController *)topViewController;
+        presentedVC = navVc.topViewController;
+    }else if([presentedVC isKindOfClass:[UITabBarController class]]) {
+        UITabBarController *tabVc = (UITabBarController *)topViewController;
+        presentedVC = tabVc.selectedViewController;
+    }
+    return presentedVC;
+}
 -(void)presentMediaPlayer{
     dispatch_async(dispatch_get_main_queue(), ^{
-        UIViewController *topViewController = [[[UIApplication sharedApplication] keyWindow] rootViewController];
-        UIViewController *presentedVC = [[[UIApplication sharedApplication]keyWindow]rootViewController];
-        if(presentedVC.presentedViewController) {
-            presentedVC = presentedVC.presentedViewController;
-        }else if([presentedVC isKindOfClass:[UINavigationController class]]){
-            UINavigationController *navVc = (UINavigationController *)topViewController;
-            presentedVC = navVc.topViewController;
-        }else if([presentedVC isKindOfClass:[UITabBarController class]]) {
-            UITabBarController *tabVc = (UITabBarController *)topViewController;
-            presentedVC = tabVc.selectedViewController;
-        }
+        UIViewController *presentedVC = [self GetPresentedVC];
         MPMediaPickerController *mediaPicker = [[MPMediaPickerController alloc] initWithMediaTypes:MPMediaTypeMusic];
         mediaPicker.delegate = self;
         mediaPicker.allowsPickingMultipleItems = YES;
@@ -78,20 +93,60 @@ RCT_EXPORT_METHOD(getList:(NSDictionary *)param callback:(RCTResponseSenderBlock
         NSMutableDictionary *trackData = [self getMediaItemDetail:item];
         [trackListData addObject:trackData];
     }
-    [mediaPicker dismissViewControllerAnimated:true completion:nil];
+    [mediaPicker.view addSubview:[self createProgressView]];
+    
     if(saveToLocal) {
         if(tracks.count > 0){
-            [self saveTracksToDocucmentDirectory:tracks exporting:^(int progress) {
-                if(progress == tracks.count) {
-                    CallBack(@[[NSNull null], trackListData]);
-                }
-            }];
+            [self SaveTracksToLocal:tracks mediaPicker:mediaPicker trackListData:trackListData];
         }else{
             CallBack(@[[NSNull null], trackListData]);
         }
     }else{
         CallBack(@[[NSNull null], trackListData]);
     }
+}
+
+
+-(void)SaveTracksToLocal:(NSArray *)tracks mediaPicker:(MPMediaPickerController *)mediaPicker trackListData:(NSMutableArray *)trackListData {
+    if(tracks.count > currentIndex) {
+        MPMediaItem *item = tracks[currentIndex];
+        [self saveTracksToDocucmentDirectory:item exporting:^(NSString *result) {
+            currentIndex++;
+            [self SaveTracksToLocal:tracks mediaPicker:mediaPicker trackListData:trackListData];
+        }];
+    }else{
+        currentIndex = 0;
+        [mediaPicker dismissViewControllerAnimated:true completion:^{
+            CallBack(@[[NSNull null], trackListData]);
+        }];
+    }
+}
+
+//Create Progress View
+
+-(UIView *)createProgressView{
+    CGFloat width = [UIScreen mainScreen].bounds.size.width;
+    CGFloat height = [UIScreen mainScreen].bounds.size.height;
+    //Progress View
+    UIView *progressView = [[UIView alloc]initWithFrame:CGRectMake(40, (height - 100)/2, width - 80, 120)];
+    progressView.layer.cornerRadius = 10;
+    progressView.backgroundColor = [UIColor colorWithRed:(180.0f/255.0f) green:(180.0f/255.0f) blue:(180.0f/255.0f) alpha:1.0];
+    
+    //ProgressLabel
+    lblProgress = [[UILabel alloc]initWithFrame:CGRectMake(0, 17, width - 80, 25)];
+    lblProgress.textColor = [UIColor whiteColor];
+    lblProgress.font = [UIFont systemFontOfSize:20];
+    lblProgress.textAlignment = NSTextAlignmentCenter;
+    [progressView addSubview:lblProgress];
+    
+    //Import Label
+    lblTitle = [[UILabel alloc]initWithFrame:CGRectMake(0, 57, width - 80, 50)];
+    lblTitle.numberOfLines = 2;
+    lblTitle.textColor = [UIColor whiteColor];
+    lblTitle.font = [UIFont systemFontOfSize:16];
+    lblTitle.textAlignment = NSTextAlignmentCenter;
+    [progressView addSubview:lblTitle];
+    return progressView;
 }
 
 //MARK:- Set Track List Raw Data
@@ -179,52 +234,85 @@ RCT_EXPORT_METHOD(getList:(NSDictionary *)param callback:(RCTResponseSenderBlock
 
 //MARK:- Save Track To Document Directory
 
--(void)saveTracksToDocucmentDirectory:(NSArray *)items exporting:(void (^) (int progress))handler {
+-(void)saveTracksToDocucmentDirectory:(MPMediaItem *)item exporting:(void (^) (NSString *result))handler {
     [self CreateMusicFolder];
-    __block int progress = 0;
-    int i = 0;
-    for(i=0;i<=items.count;i++){
-        if(items.count > i) {
-            MPMediaItem *item = items[i];
-            NSURL *url = [item valueForProperty:MPMediaItemPropertyAssetURL];
-            if(url != nil || [url isKindOfClass:[NSNull class]]) {
-                NSString *urlStr = [NSString stringWithFormat:@"%@",url];
-                NSArray *idArray = [urlStr componentsSeparatedByString:@"id="];
-                if(idArray.count > 1) {
-                    NSString *trackID = idArray[1];
-                    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-                    NSString *documentURL = [paths objectAtIndex:0];
-                    NSString *outputUrl = [documentURL stringByAppendingString:[NSString stringWithFormat:@"/Music/%@.m4a",trackID]];
-                    if ([[NSFileManager defaultManager] fileExistsAtPath:outputUrl]){
-                        progress++;
-                        NSLog(@"%@", [NSString stringWithFormat:@"File Exist : %d",progress]);
-                        handler(progress);
-                        continue;
-                    }
-                    AVAssetExportSession *exportSession = [[AVAssetExportSession alloc]initWithAsset:[AVAsset assetWithURL:url] presetName:AVAssetExportPresetAppleM4A];
-                    exportSession.shouldOptimizeForNetworkUse = true;
-                    exportSession.outputFileType = AVFileTypeAppleM4A;
-                    exportSession.outputURL = [NSURL fileURLWithPath:outputUrl];
-                    [exportSession exportAsynchronouslyWithCompletionHandler:^{
-                        if (exportSession.status == AVAssetExportSessionStatusCompleted)  {
-                            progress++;
-                            NSLog(@"%@", [NSString stringWithFormat:@"Export Successfull : %d",progress]);
-                            handler(progress);
-                        } else if(exportSession.status == AVAssetExportSessionStatusFailed) {
-                            progress++;
-                            NSLog(@"%@", [NSString stringWithFormat:@"Export failed : %d",progress]);
-                            NSLog(@"%@", exportSession.error);
-                            handler(progress);
-                        }else if (exportSession.status == AVAssetExportSessionStatusExporting) {
-                            NSLog(@"Progress : %f",exportSession.progress);
-                        }
-                    }];
-                }
+    //    __block int progress = 0;
+    //    __block int i = 0;
+    //    __block BOOL isFirstTime = true;
+    NSURL *url = [item valueForProperty:MPMediaItemPropertyAssetURL];
+    if(url != nil || [url isKindOfClass:[NSNull class]]) {
+        NSString *urlStr = [NSString stringWithFormat:@"%@",url];
+        NSArray *idArray = [urlStr componentsSeparatedByString:@"id="];
+        if(idArray.count > 1) {
+            NSString *trackID = idArray[1];
+            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+            NSString *documentURL = [paths objectAtIndex:0];
+            NSString *outputUrl = [documentURL stringByAppendingString:[NSString stringWithFormat:@"/Music/%@.m4a",trackID]];
+            NSMutableDictionary *dict = [[NSMutableDictionary alloc]init];
+            [dict setObject:item forKey:@"mediaItem"];
+            [dict setObject:[NSNumber numberWithInt:currentIndex] forKey:@"index"];
+            NSTimer *exportProgressBarTimer = [NSTimer scheduledTimerWithTimeInterval:.1 target:self selector:@selector(updateExportDisplay:) userInfo:dict repeats:YES];
+            if ([[NSFileManager defaultManager] fileExistsAtPath:outputUrl]){
+                double delayInSeconds = 1.0;
+                dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
+                dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
+                    [exportProgressBarTimer invalidate];
+                    double delayInSeconds = 1.0;
+                    dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
+                    dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
+                        [exportProgressBarTimer invalidate];
+                        handler(@"File Exist");
+                    });
+                });
             }
+            exportSession = [[AVAssetExportSession alloc]initWithAsset:[AVAsset assetWithURL:url] presetName:AVAssetExportPresetAppleM4A];
+            exportSession.shouldOptimizeForNetworkUse = true;
+            exportSession.outputFileType = AVFileTypeAppleM4A;
+            exportSession.outputURL = [NSURL fileURLWithPath:outputUrl];
+            [exportSession exportAsynchronouslyWithCompletionHandler:^{
+                if (exportSession.status == AVAssetExportSessionStatusCompleted)  {
+                    double delayInSeconds = 1.0;
+                    dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
+                    dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
+                        [exportProgressBarTimer invalidate];
+                        handler(@"Export Success");
+                    });
+                } else if(exportSession.status == AVAssetExportSessionStatusFailed) {
+                    double delayInSeconds = 1.0;
+                    dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
+                    dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
+                        [exportProgressBarTimer invalidate];
+                        handler(@"Export Failed");
+                    });
+                }
+            }];
         }
     }
 }
 
+-(void)updateExportDisplay:(NSTimer*)timer {
+    NSDictionary *dict = (NSDictionary *)[timer userInfo];
+    MPMediaItem *item = [dict objectForKey:@"mediaItem"];
+    NSString *title = [item valueForProperty: MPMediaItemPropertyTitle];
+    float progress = exportSession.progress;
+    if(title != nil || [title isKindOfClass:[NSNull class]]) {
+        if(![lblTitle.text isEqualToString:title]) {
+            lblTitle.text = title;
+        }
+    }
+    NSString *strProgress = [NSString stringWithFormat:@"%.2f%@",progress * 100,@"%"];
+    if(![lblProgress.text isEqualToString:strProgress]) {
+        lblProgress.text = strProgress;
+    }
+    if (progress > .99) {
+        lblProgress.text = @"100%";
+        double delayInSeconds = 1.0;
+        dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
+        dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
+            [timer invalidate];
+        });
+    }
+}
 
 @end
 
